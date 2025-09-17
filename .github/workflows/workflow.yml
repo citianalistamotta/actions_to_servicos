@@ -3,7 +3,7 @@ name: Run Historico
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 12 * * *"
+    - cron: "0 12 * * *" # roda todo dia às 12h UTC (~09h de Brasília)
 
 jobs:
   run-historico:
@@ -23,6 +23,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y unixodbc-dev
           pip install -r requirements.txt
+
+      - name: Debug envs 
+        env:
+          DB_SERVER: ${{ secrets.DB_SERVER }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+        run: |
+          echo "DB_SERVER=${DB_SERVER}"
+          echo "DB_NAME=${DB_NAME}"
+          echo "DB_USER=${DB_USER}"
+          echo "DB_PASS definido? -> ${DB_PASS:+SIM}"
 
       - name: Run Historico
         env:
