@@ -1,18 +1,26 @@
-import pyodbc
+import os
+from dotenv import load_dotenv
+import pymssql
+
+load_dotenv()
 
 def retornaConexao():
-    server = 'smarttravel-rds-mssql-n7ws.c9aakyyow4vn.us-east-2.rds.amazonaws.com,1433'  
-    database = 'BI_Motta_PROD' 
-    username = 'motta_bi_smartbus'  
-    password = 'Abc`"@+t|,,D/gj='  
-    driver = '{ODBC Driver 17 for SQL Server}'  
+    server = os.getenv("DB_SERVER").split(',')[0]  # remove a porta
+    port = int(os.getenv("DB_SERVER").split(',')[1])
+    database = os.getenv("DB_NAME")
+    username = os.getenv("DB_USER")
+    password = os.getenv("DB_PASS")
 
     try:
-        cnxn = pyodbc.connect(f'DRIVER={driver};SERVER={server};DATABASE={database};UID={username};PWD={password}')
+        cnxn = pymssql.connect(
+            server=server,
+            port=port,
+            user=username,
+            password=password,
+            database=database
+        )
+        print("✅ Conexão com o banco estabelecida com sucesso (pymssql)!")
         return cnxn
-    except pyodbc.Error as ex:
-        print(f"Erro ao conectar ao banco de dados: {ex}")
-        return None
-    except Exception as e:
-        print(f"Erro desconhecido ao conectar ao banco de dados: {e}")
+    except pymssql.Error as ex:
+        print(f"❌ Erro ao conectar ao banco de dados: {ex}")
         return None
