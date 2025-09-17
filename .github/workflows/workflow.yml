@@ -32,3 +32,6 @@ jobs:
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASS: ${{ secrets.DB_PASS }}
         run: python main.py
+
+      - name: Test DB connection
+        run: nc -zv smarttravel-rds-mssql-n7ws.c9aakyyow4vn.us-east-2.rds.amazonaws.com 1433
