@@ -33,3 +33,6 @@ jobs:
 
       - name: Run Historico
         run: python -c "from utils.Historico import Historico; Historico().get_valorOrdenadoCompleto()"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
