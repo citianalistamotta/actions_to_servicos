@@ -5,8 +5,9 @@ import pymssql
 load_dotenv()
 
 def retornaConexao():
-    server = os.getenv("DB_SERVER").split(',')[0]  # remove a porta
-    port = int(os.getenv("DB_SERVER").split(',')[1])
+    server_parts = os.getenv("DB_SERVER").split(',')
+    server = server_parts[0]
+    port = int(server_parts[1]) if len(server_parts) > 1 else 1433
     database = os.getenv("DB_NAME")
     username = os.getenv("DB_USER")
     password = os.getenv("DB_PASS")
