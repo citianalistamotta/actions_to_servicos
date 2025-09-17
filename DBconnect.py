@@ -19,8 +19,8 @@ def retornaConexao():
             password=password,
             database=database
         )
-        print("✅ Conexão com o banco estabelecida com sucesso (pymssql)!")
+        print("Conexão com o banco estabelecida com sucesso (pymssql)!")
         return cnxn
     except pymssql.Error as ex:
-        print(f"❌ Erro ao conectar ao banco de dados: {ex}")
+        print(f"Erro ao conectar ao banco de dados: {ex}")
         return None
