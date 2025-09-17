@@ -1,5 +1,4 @@
 import os
-from dotenv import load_dotenv
 import pymssql
 
 
@@ -21,12 +20,7 @@ def retornaConexao():
             database=database
         )
         print("✅ Conexão com o banco estabelecida com sucesso (pymssql)!")
+        return conn
     except pymssql.Error as ex:
         print(f"❌ Erro ao conectar ao banco de dados: {ex}")
-        exit(1)
-
-    # Rodar o histórico
-    Historico().get_valorOrdenadoCompleto()
-
-    conn.close()
-    EOF
+        return None
