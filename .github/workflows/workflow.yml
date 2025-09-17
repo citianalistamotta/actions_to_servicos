@@ -26,13 +26,13 @@ jobs:
 
       - name: Criar .env
         run: |
-          DB_SERVER: ${{ secrets.DB_SERVER }}
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASS: ${{ secrets.DB_PASS }}
+          echo "DB_SERVER=${{ secrets.DB_SERVER }}" >> .env
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
+          echo "DB_PASS=${{ secrets.DB_PASS }}" >> .env
 
       - name: Run Historico
-        run: python -c "from historico import Historico; Historico().get_valorOrdenadoCompleto()"
+        run: python -c "from Historico import Historico; Historico().get_valorOrdenadoCompleto()"
 
       - name: Install dependencies
         run: pip install -r requirements.txt
