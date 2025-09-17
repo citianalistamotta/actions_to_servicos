@@ -1,0 +1,4 @@
+pyodbc\npandas\npython-dotenv
+pyodbc
+pandas
+python-dotenv
