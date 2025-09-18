@@ -3,86 +3,60 @@ name: Run Historico
 on:
   workflow_dispatch:
   schedule:
-  - cron: "0 12 * * *"
+    - cron: "0 12 * * *" # todo dia às 12h UTC (~09h Brasília)
 
 jobs:
   run-historico:
     runs-on: ubuntu-latest
 
-    # Banco SQL Server como serviço (container) no próprio job
-    services:
-      sqlserver:
-        image: mcr.microsoft.com/mssql/server:2022-latest
-        env:
-          ACCEPT_EULA: "Y"
-          SA_PASSWORD: "Str0ngPassw0rd!"   # senha do SA para o container
-        ports:
-          - 1433:1433
-        options: >-
-          --health-cmd " /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'Str0ngPassw0rd!' -Q 'SELECT 1' || exit 1 "
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-
     env:
-      # Variáveis que seu código já lê (DBconnect.py)
       DB_SERVER: "localhost,1433"
       DB_NAME: "HistoricoDB"
-      DB_USER: "SA"
-      DB_PASS: "Str0ngPassw0rd!"
-      SA_PASSWORD: "Str0ngPassw0rd!"   # reaproveitada nos comandos sqlcmd
+      DB_USER: "sa"
+      # A senha aqui DEVE ser a mesma definida no passo "Start SQL Server"
+      DB_PASS: "Str0ngP@ssw0rd!"
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+
+      # 1. Instala e inicia o SQL Server diretamente no runner (sem Docker)
+      - name: Start SQL Server
+        uses: givemind/setup-sql-server@v1.1
+        with:
+          sql-server-version: "2022-latest"
+          sa-password: ${{ env.DB_PASS }} # Usa a senha definida acima
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install system dependencies and Python deps
+      # 2. Instala as dependências de sistema e do Python
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y freetds-dev freetds-bin unixodbc-dev build-essential curl gnupg
-          # Instala mssql-tools18 (sqlcmd)
-          curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
-          source /etc/os-release
-          sudo curl -fsSL "https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/prod.list" -o /etc/apt/sources.list.d/mssql-release.list
-          sudo apt-get update
-          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 mssql-tools18
-          echo 'export PATH="$PATH:/opt/mssql-tools18/bin"' >> $GITHUB_ENV
-          pip install -r requirements.txt || true
+          sudo apt-get install -y freetds-dev unixodbc-dev
+          pip install -r requirements.txt
           pip install pymssql
 
-      - name: Wait for SQL Server to be ready
+      # 3. Cria o banco de dados dentro do SQL Server recém-instalado
+      - name: Create Database
         run: |
-          export PATH="$PATH:/opt/mssql-tools18/bin"
-          for i in {1..30}; do
-            sqlcmd -S localhost -U SA -P "$SA_PASSWORD" -Q "SELECT 1" && break
-            echo "Aguardando SQL Server iniciar ($i/30)..."
-            sleep 2
-          done
+          # O comando `sqlcmd` fica disponível após a Action "setup-sql-server"
+          sqlcmd -S localhost -U sa -P "${{ env.DB_PASS }}" -Q "CREATE DATABASE [${{ env.DB_NAME }}];"
 
-      - name: Create database
+      # 4. (CRÍTICO) Popula o banco com tabelas e dados
+      - name: Populate Database from schema.sql
         run: |
-          export PATH="$PATH:/opt/mssql-tools18/bin"
-          sqlcmd -S localhost -U SA -P "$SA_PASSWORD" -Q "IF DB_ID('$(echo $DB_NAME)') IS NULL CREATE DATABASE [$(echo $DB_NAME)];"
-
-      - name: (Opcional) Executar schema.sql se existir
-        run: |
-          export PATH="$PATH:/opt/mssql-tools18/bin"
-          if [ -f schema.sql ]; then
-            echo "Aplicando schema.sql..."
-            sqlcmd -S localhost -U SA -P "$SA_PASSWORD" -d "$DB_NAME" -i schema.sql
+          # Este passo irá falhar se o arquivo 'schema.sql' não existir
+          if [ -f "schema.sql" ]; then
+            echo "Arquivo schema.sql encontrado. Executando..."
+            sqlcmd -S localhost -U sa -P "${{ env.DB_PASS }}" -d "${{ env.DB_NAME }}" -i schema.sql
           else
-            echo "schema.sql não encontrado, seguindo em frente."
+            echo "AVISO: Arquivo schema.sql não encontrado. O script principal pode falhar se as tabelas não existirem."
           fi
-
+          
+      # 5. Roda o seu script principal
       - name: Run Historico
-        env:
-          DB_SERVER: ${{ env.DB_SERVER }}
-          DB_NAME: ${{ env.DB_NAME }}
-          DB_USER: ${{ env.DB_USER }}
-          DB_PASS: ${{ env.DB_PASS }}
         run: python main.py
