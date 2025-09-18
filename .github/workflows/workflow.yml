@@ -13,19 +13,18 @@ jobs:
       DB_SERVER: "localhost,1433"
       DB_NAME: "HistoricoDB"
       DB_USER: "sa"
-      # A senha aqui DEVE ser a mesma definida no passo "Start SQL Server"
-      DB_PASS: "Str0ngP@ssw0rd!"
+      DB_PASS: "Str0ngP@ssw0rd!" # A senha DEVE ser forte
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # 1. Instala e inicia o SQL Server diretamente no runner (sem Docker)
+      # 1. Instala e inicia o SQL Server (NOME CORRIGIDO)
       - name: Start SQL Server
-        uses: givemind/setup-sql-server@v1.1
+        uses: Yawn-Sean/setup-sql-server@v1
         with:
           sql-server-version: "2022-latest"
-          sa-password: ${{ env.DB_PASS }} # Usa a senha definida acima
+          sa-password: ${{ env.DB_PASS }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -40,16 +39,20 @@ jobs:
           pip install -r requirements.txt
           pip install pymssql
 
-      # 3. Cria o banco de dados dentro do SQL Server recém-instalado
+      # 3. Adiciona as ferramentas do SQL Server ao PATH
+      - name: Add SQLCMD to PATH
+        run: echo "/opt/mssql-tools/bin" >> $GITHUB_PATH
+
+      # 4. Cria o banco de dados
       - name: Create Database
+        # Espera um pouco para garantir que o SQL Server esteja 100% online
         run: |
-          # O comando `sqlcmd` fica disponível após a Action "setup-sql-server"
+          sleep 15s 
           sqlcmd -S localhost -U sa -P "${{ env.DB_PASS }}" -Q "CREATE DATABASE [${{ env.DB_NAME }}];"
 
-      # 4. (CRÍTICO) Popula o banco com tabelas e dados
+      # 5. Popula o banco com tabelas e dados
       - name: Populate Database from schema.sql
         run: |
-          # Este passo irá falhar se o arquivo 'schema.sql' não existir
           if [ -f "schema.sql" ]; then
             echo "Arquivo schema.sql encontrado. Executando..."
             sqlcmd -S localhost -U sa -P "${{ env.DB_PASS }}" -d "${{ env.DB_NAME }}" -i schema.sql
@@ -57,6 +60,7 @@ jobs:
             echo "AVISO: Arquivo schema.sql não encontrado. O script principal pode falhar se as tabelas não existirem."
           fi
           
-      # 5. Roda o seu script principal
+      # 6. Roda o seu script principal
       - name: Run Historico
         run: python main.py
+
