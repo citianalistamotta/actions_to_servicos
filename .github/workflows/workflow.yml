@@ -1,66 +1,85 @@
-name: Run Historico
+name: Run Histórico
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 12 * * *" # todo dia às 12h UTC (~09h Brasília)
+    - cron: "0 12 * * *"  # todo dia às 12h UTC
 
 jobs:
   run-historico:
     runs-on: ubuntu-latest
 
     env:
-      DB_SERVER: "localhost,1433"
+      DB_SERVER: "localhost"
+      DB_PORT: "1433"
       DB_NAME: "HistoricoDB"
       DB_USER: "sa"
-      DB_PASS: "Str0ngP@ssw0rd!" # A senha DEVE ser forte
+      DB_PASS: "Str0ngP@ssw0rd!"
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # 1. Instala e inicia o SQL Server (NOME CORRIGIDO)
-      - name: Start SQL Server
-        uses: Yawn-Sean/setup-sql-server@v1
-        with:
-          sql-server-version: "2022-latest"
-          sa-password: ${{ env.DB_PASS }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      # 2. Instala as dependências de sistema e do Python
-      - name: Install dependencies
+      - name: Instalar dependências do sistema
         run: |
           sudo apt-get update
-          sudo apt-get install -y freetds-dev unixodbc-dev
-          pip install -r requirements.txt
-          pip install pymssql
+          sudo apt-get install -y curl gnupg apt-transport-https
 
-      # 3. Adiciona as ferramentas do SQL Server ao PATH
-      - name: Add SQLCMD to PATH
-        run: echo "/opt/mssql-tools/bin" >> $GITHUB_PATH
-
-      # 4. Cria o banco de dados
-      - name: Create Database
-        # Espera um pouco para garantir que o SQL Server esteja 100% online
+      - name: Configurar repositório Microsoft
         run: |
-          sleep 15s 
-          sqlcmd -S localhost -U sa -P "${{ env.DB_PASS }}" -Q "CREATE DATABASE [${{ env.DB_NAME }}];"
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
+          DISTRO=$(lsb_release -is | tr '[:upper:]' '[:lower:]')
+          CODENAME=$(lsb_release -cs)
+          echo "deb [arch=amd64] https://packages.microsoft.com/${DISTRO}/${CODENAME}/prod ${CODENAME} main" | sudo tee /etc/apt/sources.list.d/microsoft.list
+          sudo apt-get update
 
-      # 5. Popula o banco com tabelas e dados
-      - name: Populate Database from schema.sql
+      - name: Instalar SQL Server
+        run: |
+          sudo ACCEPT_EULA=Y apt-get install -y mssql-server
+          # Configurar o SQL Server (não interativo)
+          sudo /opt/mssql/bin/mssql-conf setup accept-eula=Y sa-password="${{ env.DB_PASS }}" <<EOF
+        # Nessa etapa, normalmente é preciso passar parâmetros, mas como se trata de uma instalação automática
+        # podemos usar o comando 'setup' com modo silencioso, dependendo do Ubuntu.
+        # Como alternativa, faremos uma instalação inicial básica e iniciamos o serviço.
+          
+      - name: Iniciar o serviço do SQL Server
+        run: |
+          sudo systemctl start mssql-server
+          sleep 20 # esperar o SQL Server subir
+
+      - name: Instalar ferramentas SQL
+        run: |
+          curl https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
+          sudo curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y mssql-tools unixodbc-dev
+          echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> $GITHUB_ENV
+          source ~/.bashrc
+
+      - name: Aguarde o SQL Server ficar pronto
+        run: |
+          for i in {1..30}; do
+            /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "${{ env.DB_PASS }}" -Q "SELECT 1" && break
+            echo "Aguardando SQL Server iniciar ($i/30)..."
+            sleep 2
+          done
+
+      - name: Criar banco de dados
+        run: |
+          /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "${{ env.DB_PASS }}" -Q "IF DB_ID('${{ env.DB_NAME }}') IS NULL CREATE DATABASE [${{ env.DB_NAME }}];"
+
+      - name: Executar schema.sql
         run: |
           if [ -f "schema.sql" ]; then
-            echo "Arquivo schema.sql encontrado. Executando..."
-            sqlcmd -S localhost -U sa -P "${{ env.DB_PASS }}" -d "${{ env.DB_NAME }}" -i schema.sql
+            echo "Executando schema.sql..."
+            /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "${{ env.DB_PASS }}" -d "${{ env.DB_NAME }}" -i schema.sql
           else
-            echo "AVISO: Arquivo schema.sql não encontrado. O script principal pode falhar se as tabelas não existirem."
+            echo "schema.sql não encontrado, pulando..."
           fi
-          
-      # 6. Roda o seu script principal
-      - name: Run Historico
-        run: python main.py
+
+      - name: Rodar seu código
+        run: |
+          pip install -r requirements.txt
+          pip install pymssql
+          python main.py
 
