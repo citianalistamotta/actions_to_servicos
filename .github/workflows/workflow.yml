@@ -27,7 +27,7 @@ jobs:
 
       - name: Configurar repositório Microsoft
         run: |
-          curl https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
+          curl -fsSL https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
           DISTRO=$(lsb_release -is | tr '[:upper:]' '[:lower:]')
           CODENAME=$(lsb_release -cs)
           echo "deb [arch=amd64] https://packages.microsoft.com/${DISTRO}/${CODENAME}/prod ${CODENAME} main" | sudo tee /etc/apt/sources.list.d/microsoft.list
