@@ -34,7 +34,7 @@ jobs:
       - name: Instalar SQL Server
         run: |
           sudo ACCEPT_EULA=Y apt-get install -y mssql-server
-          sudo /opt/mssql/bin/mssql-conf setup accept-eula=Y sa-password="${{ env.DB_PASS }}"
+          sudo /opt/mssql/bin/mssql-conf set-sa-password "${{ env.DB_PASS }}"
 
       - name: Iniciar o serviço do SQL Server
         run: |
@@ -43,7 +43,7 @@ jobs:
 
       - name: Instalar ferramentas SQL
         run: |
-          curl https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/microsoft.gpg
           curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/mssql-server-2022.list | sudo tee /etc/apt/sources.list.d/microsoft-mssql-server.list
           sudo apt-get update
           sudo ACCEPT_EULA=Y apt-get install -y mssql-tools unixodbc-dev
