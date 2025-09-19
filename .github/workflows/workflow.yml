@@ -10,62 +10,35 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      DB_SERVER: "localhost"
-      DB_PORT: "1433"
-      DB_NAME: "HistoricoDB"
-      DB_USER: "sa"
-      DB_PASS: "Str0ngP@ssw0rd!"
+      DB_SERVER: ${{ secrets.DB_SERVER }}
+      DB_PORT: ${{ secrets.DB_PORT }}
+      DB_NAME: ${{ secrets.DB_NAME }}
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASS: ${{ secrets.DB_PASS }}
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Instalar dependências do sistema
+      - name: Instalar ferramentas SQL
         run: |
           sudo apt-get update
           sudo apt-get install -y curl gnupg apt-transport-https
-
-      - name: Configurar repositório Microsoft para Ubuntu 22.04
-        run: |
           curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/microsoft.gpg
-          curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/mssql-server-2022.list | sudo tee /etc/apt/sources.list.d/microsoft-mssql-server.list
-          sudo apt-get update
-
-      - name: Instalar SQL Server
-        run: |
-          sudo ACCEPT_EULA=Y apt-get install -y mssql-server
-          sudo /opt/mssql/bin/mssql-conf set-sa-password "${{ env.DB_PASS }}"
-
-      - name: Iniciar o serviço do SQL Server
-        run: |
-          sudo systemctl start mssql-server
-          sleep 20 # aguarde o SQL Server iniciar
-
-      - name: Instalar ferramentas SQL
-        run: |
-          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/microsoft.gpg
-          curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/mssql-server-2022.list | sudo tee /etc/apt/sources.list.d/microsoft-mssql-server.list
+          curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
           sudo apt-get update
           sudo ACCEPT_EULA=Y apt-get install -y mssql-tools unixodbc-dev
           echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> $GITHUB_ENV
 
-      - name: Aguarde o SQL Server ficar pronto
+      - name: Testar conexão com o banco
         run: |
-          for i in {1..30}; do
-            /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "${{ env.DB_PASS }}" -Q "SELECT 1" && break
-            echo "Aguardando SQL Server iniciar ($i/30)..."
-            sleep 2
-          done
+          /opt/mssql-tools/bin/sqlcmd -S "${{ env.DB_SERVER }},${{ env.DB_PORT }}" -U "${{ env.DB_USER }}" -P "${{ env.DB_PASS }}" -Q "SELECT DB_NAME();"
 
-      - name: Criar banco de dados
-        run: |
-          /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "${{ env.DB_PASS }}" -Q "IF DB_ID('${{ env.DB_NAME }}') IS NULL CREATE DATABASE [${{ env.DB_NAME }}];"
-
-      - name: Executar schema.sql
+      - name: Executar schema.sql (opcional)
         run: |
           if [ -f "schema.sql" ]; then
             echo "Executando schema.sql..."
-            /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "${{ env.DB_PASS }}" -d "${{ env.DB_NAME }}" -i schema.sql
+            /opt/mssql-tools/bin/sqlcmd -S "${{ env.DB_SERVER }},${{ env.DB_PORT }}" -U "${{ env.DB_USER }}" -P "${{ env.DB_PASS }}" -d "${{ env.DB_NAME }}" -i schema.sql
           else
             echo "schema.sql não encontrado, pulando..."
           fi
