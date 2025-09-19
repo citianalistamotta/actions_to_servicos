@@ -1,15 +1,13 @@
 import os
 import pymssql
 
-
 def retornaConexao():
-    # Pega diretamente das variáveis de ambiente (definidas nos Secrets do GitHub Actions)
-    server_parts = os.environ["DB_SERVER"].split(',')
-    server = server_parts[0]
-    port = int(server_parts[1]) if len(server_parts) > 1 else 1433
-    database = os.environ["DB_NAME"]
-    username = os.environ["DB_USER"]
-    password = os.environ["DB_PASS"]
+    # Lê credenciais do ambiente (preenchidas a partir dos secrets no GitHub Actions)
+    server = os.environ.get("DB_SERVER")
+    port = int(os.environ.get("DB_PORT", 1433))  # usa 1433 como padrão se não vier nada
+    database = os.environ.get("DB_NAME")
+    username = os.environ.get("DB_USER")
+    password = os.environ.get("DB_PASS")
 
     try:
         conn = pymssql.connect(

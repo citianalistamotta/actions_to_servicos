@@ -32,14 +32,13 @@ jobs:
 
       - name: Testar conexão com o banco
         run: |
-          /opt/mssql-tools/bin/sqlcmd -S "${{ secrets.DB_SERVER }},${{ secrets.DB_PORT }}" -U "${{ secrets.DB_USER }}" -P "${{ secrets.DB_PASS }}" -Q "SELECT DB_NAME();"
-
+          /opt/mssql-tools/bin/sqlcmd -S "$DB_SERVER,$DB_PORT" -U "$DB_USER" -P "$DB_PASS"
 
       - name: Executar schema.sql (opcional)
         run: |
           if [ -f "schema.sql" ]; then
             echo "Executando schema.sql..."
-            /opt/mssql-tools/bin/sqlcmd -S "${{ secrets.DB_SERVER }},${{ secrets.DB_PORT }}" -U "${{ secrets.DB_USER }}" -P "${{ secrets.DB_PASS }}" -d "${{ secrets.DB_NAME }}" -i schema.sql
+            /opt/mssql-tools/bin/sqlcmd -S "$DB_SERVER,$DB_PORT" -U "$DB_USER" -P "$DB_PASS" -d "$DB_NAME" -i schema.sql
           else
             echo "schema.sql não encontrado, pulando..."
           fi
